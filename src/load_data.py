@@ -14,7 +14,7 @@ import pandas as pd
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-RAW_DATA_PATH = Path("E:/MLops/1-mlops-kickoff-repo/data/raw/telecom_churn.csv")
+RAW_DATA_PATH = Path("data/raw/telecom_churn.csv")
 
 
 def load_csv(path: Path) -> pd.DataFrame:
