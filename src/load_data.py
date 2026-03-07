@@ -19,6 +19,13 @@ RAW_DATA_PATH = Path("data/raw/telecom_churn.csv")
 
 def load_csv(path: Path) -> pd.DataFrame:
     """Centralized CSV loader with error handling (Steps 4 & 5)."""
+    raw = Path(path).read_bytes()
+    if b"\x00" in raw:
+        raise RuntimeError(
+            f"Failed to parse CSV at '{path}'.\n"
+            f"Check that the file is a valid CSV and not corrupted.\n"
+            f"File contains null bytes and is likely not a valid CSV."
+        )
     try:
         df = pd.read_csv(path)
     except Exception as e:

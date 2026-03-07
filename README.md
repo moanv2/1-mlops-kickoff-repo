@@ -1,6 +1,6 @@
-# [Project Name: e.g., Retail Sales Forecasting]
+# CUSTOMER CHURN ANALYSIS 
 
-**Author:** TODO_STUDENT (Your Group Name or number)  
+**Author:** Group 5 (Your Group Name or number)  
 **Course:** MLOps: Master in Business Analytics and Data Sciense
 **Status:** Session 1 (Initialization)
 
@@ -10,10 +10,15 @@
 *Replace this section with your project definition.*
 
 * **The Goal:** What business value does this model create?
-  > *Example: Reduce food waste by 10% by predicting daily bakery demand.*
+Build a machine learning model to predict customer churn for a telecommunications company. They can then identify customers at risk of leaving and take retention actions.
+
+The model creates business value by:
+  - Reducing customer acquisition costs
+  - Increasing customer lifetime value
+  - Improving their retention strategy
 
 * **The User:** Who consumes the output and how?
-  > *Example: Store managers receive a weekly PDF report on Monday mornings.*
+Marketing team receives an Excel file report listing customers and their predicted churn probability.
 
 ---
 
@@ -21,21 +26,22 @@
 *How do we know if the project is successful?*
 
 * **Business KPI (The "Why"):**
-  > *Example: Reduce unsold inventory costs by $5,000/month.*
+ - Reduce churn rate among high-value customer.
+ - Minimize revenue at risk (sum of monthly charge x churn).
 
 * **Technical Metric (The "How"):**
-  > *Example: Model MAPE (Mean Absolute Percentage Error) < 15% on the test set.*
+ Weighted F1 Score for Classification, since it will handle class imbalance.
 
 * **Acceptance Criteria:**
-  > *Example: The model must outperform the current "moving average" baseline.*
+The model must outperform the majority-class baseline.
 
 ---
 
 ## 3. The Data
 
-* **Source:** (e.g., Company Database, Kaggle CSV, API).
-* **Target Variable:** What specifically are you predicting/ classifying?
-* **Sensitive Info:** Are there emails, credit cards, or any PII (Personally Identifiable Information)?
+* **Source:** Kaggle CSV (Customer Churn Analysis and Classification)
+* **Target Variable:** Churn as binary (1 for Customer churned, 0 for Customer retained)
+* **Sensitive Info:** No emails, credit cards, or PII (Personally Identifiable Information) in the dataset.
   > *⚠️ **WARNING:** If the dataset contains sensitive data, it must NEVER be committed to GitHub. Ensure `data/` is in your `.gitignore`.*
 
 ---
@@ -58,6 +64,7 @@ This project follows a strict separation between "Sandbox" (Notebooks) and "Prod
 │   ├── __init__.py          # Python package
 │   ├── load_data.py         # Ingest raw data
 │   ├── clean_data.py        # Preprocessing & cleaning
+│   ├── features.py          # Feature engineering
 │   ├── validate.py          # Data quality checks
 │   ├── train.py             # Model training & saving
 │   ├── evaluate.py          # Metrics & plotting
@@ -75,11 +82,14 @@ This project follows a strict separation between "Sandbox" (Notebooks) and "Prod
 └── tests/                   # Automated tests
 ```
 
-## 5. Execution Model
+## 5. Setup & Execution
+**1. Create and activate the environment:**
+```bash
+conda env create -f environment.yml
+conda activate test_env
+```
 
-The full machine learning pipeline will eventually be executable through:
-
-`python src/main.py`
-
-
-
+**2. Run the pipeline:**
+```bash
+python -m src.main
+```
