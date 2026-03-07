@@ -178,7 +178,7 @@ def evaluate_model(
         plot_path = REPORTS_DIR / "confusion_matrix.png"
         fig.savefig(plot_path)
         plt.close(fig)
-        print(f"[evaluate.evaluate_model] Saved confusion matrix → {plot_path}")  # TODO: replace with logging later
+        print(f"[evaluate.evaluate_model] Saved confusion matrix -> {plot_path}")  # TODO: replace with logging later
 
     # --------------------------------------------------------
     # END STUDENT CODE
@@ -204,3 +204,4 @@ def evaluate_model(
 
     print("[evaluate.evaluate_model] Evaluation complete.")  # TODO: replace with logging later
     return metric_value
+>>>>>>> 2fc2a9a (Fixed an error on evaluate.py there was a character that could not be processed)
