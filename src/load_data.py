@@ -3,7 +3,7 @@ Module: Data Loading
 --------------------
 Role: Load the raw telecom churn dataset with validation and logging.
 Usage: from src.load_data import load_data
-Written by: Diego Alfaro (if you have any questions ask me)
+Written by: Diego (if you have any questions ask me)
 """
 
 import logging
@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pandas as pd
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 RAW_DATA_PATH = Path("data/raw/telecom_churn.csv")
@@ -28,7 +29,7 @@ def load_csv(path: Path) -> pd.DataFrame:
         )
     try:
         df = pd.read_csv(path)
-    except Exception as e:
+    except (pd.errors.ParserError, pd.errors.EmptyDataError, OSError) as e:
         raise RuntimeError(
             f"Failed to parse CSV at '{path}'.\n"
             f"Check that the file is a valid CSV and not corrupted.\n"
@@ -72,7 +73,10 @@ def load_data(path: Path = RAW_DATA_PATH) -> pd.DataFrame:
         )
 
     # Step 6: Log incoming volume
-    logger.info(f"Loaded '{path}': {df.shape[0]} rows, {df.shape[1]} columns")
+    logger.info("Loaded '%s': %d rows, %d columns",
+                path,
+                df.shape[0],
+                df.shape[1])
 
     return df
 
