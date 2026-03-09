@@ -55,7 +55,7 @@ def run_pipeline(config: dict) -> float:
 
     # Step 6: Train (FunctionTransformer passes features through — already engineered above)
     preprocessor = FunctionTransformer()
-    fitted_pipeline, X_test, y_test = train_model(
+    fitted_pipeline, X_val, y_val, X_test, y_test = train_model(
         X, y, preprocessor,
         config["train"]["problem_type"],
         config["train"]["model_path"],
