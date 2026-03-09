@@ -4,11 +4,22 @@ Educational Goal:
 - Responsibility (separation of concerns): Check schema/quality only. Do NOT clean, transform, or load data.
 - Pipeline contract (inputs and outputs): Receives a DataFrame + required columns. Returns True or raises ValueError (fail-fast).
 
-TODO: Replace print statements with standard library logging in a later session
 TODO: Any temporary or hardcoded variable or parameter will be imported from config.yml in a later session
 """
 
+import logging
+import pathlib
 import pandas as pd
+import yaml
+
+logger = logging.getLogger(__name__)
+
+_CONFIG_PATH = pathlib.Path(__file__).parent.parent / "config.yaml"
+
+with open(_CONFIG_PATH, "r") as _f:
+    _config = yaml.safe_load(_f)
+
+_validate_cfg = _config.get("validate", {})
 
 
 def validate_dataframe(df: pd.DataFrame, required_columns: list) -> bool:
@@ -22,7 +33,7 @@ def validate_dataframe(df: pd.DataFrame, required_columns: list) -> bool:
     Why this contract matters for reliable ML delivery:
     - Early, clear failures reduce debugging time and prevent silent corruption of metrics/artifacts.
     """
-    print("[validate.validate_dataframe] Starting data validation checks...")  # TODO: replace with logging later
+    logger.info("Starting data validation checks...")
 
     if df is None:
         raise ValueError("Validation failed: df is None. Upstream step did not return a DataFrame.")
@@ -31,7 +42,7 @@ def validate_dataframe(df: pd.DataFrame, required_columns: list) -> bool:
         raise ValueError(
             "Validation failed: The DataFrame is empty. Check your load_data and clean_data steps."
         )
-    print(f"[validate.validate_dataframe] DataFrame shape: {df.shape}")  # TODO: replace with logging later
+    logger.info("DataFrame shape: %s", df.shape)
 
     missing_cols = [col for col in required_columns if col not in df.columns]
     if missing_cols:
@@ -39,7 +50,7 @@ def validate_dataframe(df: pd.DataFrame, required_columns: list) -> bool:
             f"Validation failed: Missing required columns: {missing_cols}. "
             f"Columns present: {df.columns.tolist()}"
         )
-    print("[validate.validate_dataframe] All required columns are present.")  # TODO: replace with logging later
+    logger.info("All required columns are present.")
 
     # --------------------------------------------------------
     # START STUDENT CODE
@@ -50,27 +61,24 @@ def validate_dataframe(df: pd.DataFrame, required_columns: list) -> bool:
     for col in required_columns:
         if df[col].isnull().any():
             raise ValueError(f"Validation failed: Required column '{col}' contains missing values.")
-    print("[validate.validate_dataframe] No missing values in required columns.")  # TODO: replace with logging later
+    logger.info("No missing values in required columns.")
 
     # Check 2: No duplicate rows
     n_duplicates = int(df.duplicated().sum())
     if n_duplicates > 0:
         raise ValueError(f"Validation failed: Dataset contains {n_duplicates} duplicate row(s).")
-    print("[validate.validate_dataframe] No duplicate rows found.")  # TODO: replace with logging later
+    logger.info("No duplicate rows found.")
 
     # Telecom-specific checks (run only if those columns exist)
-    non_negative_cols = [
-        "AccountWeeks", "DataUsage", "CustServCalls",
-        "DayMins", "DayCalls", "MonthlyCharge", "OverageFee", "RoamMins",
-    ]
-    if set(non_negative_cols).issubset(df.columns):
+    non_negative_cols = _validate_cfg.get("non_negative_cols", [])
+    if non_negative_cols and set(non_negative_cols).issubset(df.columns):
         for col in non_negative_cols:
             if (df[col] < 0).any():
                 raise ValueError(f"Validation failed: Column '{col}' contains negative values.")
-        print("[validate.validate_dataframe] Telecom numeric columns are non-negative.")  # TODO: replace with logging later
+        logger.info("Telecom numeric columns are non-negative.")
 
-    binary_cols = ["Churn", "ContractRenewal", "DataPlan"]
-    if set(binary_cols).issubset(df.columns):
+    binary_cols = _validate_cfg.get("binary_cols", [])
+    if binary_cols and set(binary_cols).issubset(df.columns):
         for col in binary_cols:
             invalid = df.loc[~df[col].isin([0, 1]), col]
             if not invalid.empty:
@@ -78,10 +86,10 @@ def validate_dataframe(df: pd.DataFrame, required_columns: list) -> bool:
                     f"Validation failed: Column '{col}' contains values outside {{0, 1}}: "
                     f"{invalid.unique().tolist()}"
                 )
-        print("[validate.validate_dataframe] Telecom binary columns contain only 0/1.")  # TODO: replace with logging later
+        logger.info("Telecom binary columns contain only 0/1.")
     # --------------------------------------------------------
     # END STUDENT CODE
     # --------------------------------------------------------
 
-    print("[validate.validate_dataframe] All validation checks passed.")  # TODO: replace with logging later
+    logger.info("All validation checks passed.")
     return True

@@ -48,15 +48,4 @@ validation:
 # ── Training ──────────────────────────────────────────────────
 train:
   test_size: 0.2
-  random_state: 42
-
-# ── Evaluation ────────────────────────────────────────────────
-evaluate:
-  reports_dir: "reports/figures"
-
-# ── Logging ───────────────────────────────────────────────────
-logging:
-  log_file: "logs/main.log"
-  format: "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
-  datefmt: "%Y-%m-%d %H:%M:%S"
-  level: "INFO"
+  seed: 42
