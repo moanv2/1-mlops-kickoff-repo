@@ -1,47 +1,42 @@
 """
-Module: Model Training
-----------------------
-Role: Split data, train model, and save the artifact.
-Input: pandas.DataFrame (Processed).
-Output: Serialized model file (e.g., .pkl) in `models/`.
+train.py
+
+Fixes applied (per project priorities):
+- Load defaults from config.yaml instead of hardcoded constants (with safe fallback)
+- Replace print() with logging
+- Implement 3-way split: train/validation/test
+- Keep Pipeline step names: ["preprocess", "model"]
+- Save fitted pipeline artifact to disk (create directory if missing)
+
+Returns:
+    fitted_pipeline, X_val, y_val, X_test, y_test
 """
 
-"""
-Educational Goal:
+from __future__ import annotations
 
-Why this module exists in an MLOps system: Training is the core step where
-a model learns patterns from data. In a production MLOps system, this step
-must be reproducible, isolated from data leakage, and produce a
-deployment-ready artifact that bundles both preprocessing and the model.
-
-Responsibility (separation of concerns): This module is responsible for
-splitting data into train/test sets, fitting a Scikit-Learn Pipeline on the
-training split, saving the fitted pipeline as a .pkl artifact, and returning
-the test split for downstream evaluation.
-
-Pipeline contract (inputs and outputs):
-  Inputs:  X (pd.DataFrame)        — full feature matrix (all rows)
-           y (pd.Series)           — full target vector (all rows)
-           preprocessor            — a fitted-or-unfitted ColumnTransformer
-                                     (will be fit inside the Pipeline)
-           problem_type (str)      — "regression" or "classification"
-           model_path (str)        — destination path for the .pkl artifact
-           test_size (float)       — fraction of data held out for testing
-           random_state (int)      — seed for reproducible splits
-  Outputs: fitted_pipeline         — fitted sklearn.pipeline.Pipeline
-           X_test (pd.DataFrame)   — held-out feature matrix
-           y_test (pd.Series)      — held-out target vector
-
-TODO: Replace print statements with standard library logging in a later session
-TODO: Any temporary or hardcoded variable or parameter will be imported from config.yml in a later session
-"""
-
+import logging
 import os
-import pandas as pd
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
+
 import joblib
+import pandas as pd
+import yaml
+from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.linear_model import Ridge, LogisticRegression
-from sklearn.model_selection import cross_val_score, train_test_split
+
+LOGGER = logging.getLogger(__name__)
+
+
+def _load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
+    """Load config.yaml if present; otherwise return {} (keeps module runnable)."""
+    path = Path(config_path)
+    if not path.exists():
+        LOGGER.info("Config file not found at %s. Using function defaults.", config_path)
+        return {}
+    with path.open("r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
 
 
 def train_model(
@@ -49,110 +44,121 @@ def train_model(
     y: pd.Series,
     preprocessor,
     problem_type: str,
-    model_path: str = "models/model.pkl",
-    test_size: float = 0.2,
-    random_state: int = 42,
-) -> tuple:
+    model_path: Optional[str] = None,
+    test_size: Optional[float] = None,
+    val_size: Optional[float] = None,
+    random_state: Optional[int] = None,
+    config_path: str = "config.yaml",
+) -> Tuple[Pipeline, pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
     """
-    Inputs:
+    Train a sklearn Pipeline (preprocessor + estimator) with a 3-way split.
 
-        X            (pd.DataFrame) : Full feature matrix (all rows).
-                                      Must not be empty.
-        y            (pd.Series)    : Full target vector aligned row-for-row
-                                      with X. Must have the same length.
-        preprocessor                : A Scikit-Learn ColumnTransformer (or any
-                                      transformer) that handles numeric scaling
-                                      and categorical encoding. It will be fit
-                                      inside the Pipeline to prevent leakage.
-        problem_type (str)          : Task type — must be "regression" or
-                                      "classification". Controls which
-                                      estimator is added to the Pipeline.
-        model_path   (str)          : File path where the fitted pipeline will
-                                      be saved as a .pkl artifact. The parent
-                                      directory is created if it does not exist.
-        test_size    (float)        : Proportion of data reserved for testing
-                                      (default 0.2 = 20%).
-        random_state (int)          : Random seed for reproducible splits
-                                      (default 42).
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Full feature matrix.
+    y : pd.Series | single-column pd.DataFrame
+        Full target vector aligned with X.
+    preprocessor : Transformer
+        ColumnTransformer (or similar) used in the pipeline as "preprocess".
+    problem_type : str
+        "regression" or "classification".
+    model_path : str | None
+        Where to save the fitted pipeline artifact (joblib).
+    test_size : float | None
+        Fraction held out for final test split (from full dataset).
+    val_size : float | None
+        Fraction held out for validation split (from full dataset).
+    random_state : int | None
+        Seed for reproducibility.
+    config_path : str
+        Path to config.yaml to source defaults.
 
-    Outputs:
-
-        fitted_pipeline (Pipeline)  : A Scikit-Learn Pipeline with two named
-                                      steps — "preprocess" and "model" — fit
-                                      on the training split only.
-        X_test (pd.DataFrame)       : Held-out feature matrix for evaluation.
-        y_test (pd.Series)          : Held-out target vector for evaluation.
-
-    Why this contract matters for reliable ML delivery:
-
-        Bundling preprocessing and the model into a single Pipeline object
-        guarantees that every prediction — whether during evaluation, staging,
-        or production — passes through exactly the same transformation logic.
-        This eliminates a whole class of training/serving skew bugs. Enforcing
-        that .fit() is called only on the training split maintains leakage
-        boundaries, making evaluation metrics trustworthy. Saving the artifact
-        with joblib ensures the pipeline can be loaded and served without
-        re-training.
+    Returns
+    -------
+    (fitted_pipeline, X_val, y_val, X_test, y_test)
     """
-    print(f"[train_model] Starting model training for problem type: '{problem_type}'")  # TODO: replace with logging later
+    cfg = _load_config(config_path)
+    train_cfg = cfg.get("train", cfg)  # tolerate either train: block or top-level keys
 
-    # ------------------------------------------------------------------
-    # Fail-fast guardrails — catch bad inputs before sklearn sees them
-    # ------------------------------------------------------------------
-    if X.empty:
-        raise ValueError(
-            "[train_model] X is empty. Cannot train on zero samples. "
-            "Check that your data loading and cleaning steps produced a "
-            "non-empty DataFrame."
-        )
-
-    if len(X) != len(y):
-        raise ValueError(
-            f"[train_model] Shape mismatch: X has {len(X)} rows "
-            f"but y has {len(y)} entries. They must be aligned "
-            "row-for-row."
-        )
-
-    # ------------------------------------------------------------------
-    # Train / test split
-    # ------------------------------------------------------------------
-    print(f"[train_model] Splitting data: test_size={test_size}, random_state={random_state}")  # TODO: replace with logging later
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state
-    )
-
-    print(f"[train_model] Train size: {len(X_train)} rows | Test size: {len(X_test)} rows")  # TODO: replace with logging later
-
-    # ------------------------------------------------------------------
-    # Model selection based on problem type
-    # ------------------------------------------------------------------
-    print(f"[train_model] Selecting estimator for problem type: '{problem_type}'")  # TODO: replace with logging later
+    model_path = model_path or train_cfg.get("model_path", "models/model.pkl")
+    test_size = float(test_size if test_size is not None else train_cfg.get("test_size", 0.2))
+    val_size = float(val_size if val_size is not None else train_cfg.get("val_size", 0.2))
+    random_state = int(random_state if random_state is not None else train_cfg.get("random_state", 42))
 
     problem_type_normalized = problem_type.strip().lower()
+    LOGGER.info("Starting training: problem_type=%s", problem_type_normalized)
 
+    # -----------------------------
+    # Guardrails
+    # -----------------------------
+    if not isinstance(X, pd.DataFrame):
+        raise ValueError("X must be a pandas DataFrame.")
+    if isinstance(y, pd.DataFrame):
+        if y.shape[1] != 1:
+            raise ValueError("y DataFrame must have exactly one column.")
+        y = y.iloc[:, 0]
+    if not isinstance(y, pd.Series):
+        raise ValueError("y must be a pandas Series (or single-column DataFrame).")
+
+    if X.empty:
+        raise ValueError("X is empty. Cannot train on zero samples.")
+    if len(X) != len(y):
+        raise ValueError(f"Shape mismatch: X has {len(X)} rows but y has {len(y)} entries.")
+
+    if not (0.0 < test_size < 1.0) or not (0.0 < val_size < 1.0):
+        raise ValueError("test_size and val_size must be floats in (0, 1).")
+    if test_size + val_size >= 1.0:
+        raise ValueError("test_size + val_size must be < 1.0.")
+
+    # -----------------------------
+    # 3-way split: train/val/test
+    # -----------------------------
+    stratify = y if problem_type_normalized == "classification" else None
+
+    LOGGER.info(
+        "Splitting data (3-way): test_size=%.3f val_size=%.3f random_state=%d",
+        test_size,
+        val_size,
+        random_state,
+    )
+
+    # Split off test
+    X_temp, X_test, y_temp, y_test = train_test_split(
+        X,
+        y,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=stratify,
+    )
+
+    # Split remaining into train/val; convert val_size to fraction of remaining
+    val_fraction_of_temp = val_size / (1.0 - test_size)
+    stratify_temp = y_temp if problem_type_normalized == "classification" else None
+
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_temp,
+        y_temp,
+        test_size=val_fraction_of_temp,
+        random_state=random_state,
+        stratify=stratify_temp,
+    )
+
+    LOGGER.info("Split sizes: train=%d val=%d test=%d", len(X_train), len(X_val), len(X_test))
+
+    # -----------------------------
+    # Model selection
+    # -----------------------------
     if problem_type_normalized == "regression":
-        estimator = Ridge()  # TODO: alpha will be imported from config.yml later
-
+        estimator = Ridge(random_state=random_state)
     elif problem_type_normalized == "classification":
-        # solver='liblinear' is deterministic and well-suited for small-to-medium
-        # datasets; random_state=42 ensures reproducible results across runs.
         estimator = LogisticRegression(
             solver="liblinear",
             max_iter=500,
-            random_state=42,  # TODO: random_state will be imported from config.yml later
+            random_state=random_state,
         )
-
     else:
-        raise ValueError(
-            f"[train_model] Unsupported problem_type: '{problem_type}'. "
-            "Expected 'regression' or 'classification'."
-        )
-
-    # ------------------------------------------------------------------
-    # Build the unified Pipeline artifact
-    # ------------------------------------------------------------------
-    print("[train_model] Building sklearn Pipeline with steps: ['preprocess', 'model']")  # TODO: replace with logging later
+        raise ValueError("Unsupported problem_type. Expected 'regression' or 'classification'.")
 
     pipeline = Pipeline(
         steps=[
@@ -161,56 +167,14 @@ def train_model(
         ]
     )
 
-    # --------------------------------------------------------
-    # START STUDENT CODE
-    # --------------------------------------------------------
-    # TODO_STUDENT: Paste your notebook logic here to replace or extend the baseline
-    # Why: The right model and its hyperparameters depend heavily on the
-    # dataset size, feature types, class imbalance, and business requirements.
-    # The baseline (Ridge / LogisticRegression) is intentionally simple so you
-    # can swap it out once you understand the data.
-    #
-    # Examples:
-    # 1. Replace Ridge with RandomForestRegressor(n_estimators=100, random_state=42)
-    #    when the target relationship is non-linear.
-    # 2. Replace LogisticRegression with GradientBoostingClassifier(random_state=42)
-    #    when you have imbalanced classes or complex decision boundaries.
-    #
-    # Optional forcing function (leave commented):
-    # raise NotImplementedError("Student: You must implement this logic to proceed!")
-
-    # --- Baseline implementation (dev-ready) ---
-    # Report which estimator is active so the dev can confirm model selection.
-    print(f"[train_model] Active estimator: {estimator.__class__.__name__}")  # TODO: replace with logging later
-    print(f"[train_model] Training features: {X_train.shape[1]} columns, {len(X_train)} rows")  # TODO: replace with logging later
-
-    # Cross-validation sanity check on the training split only (no leakage).
-    # This gives an early signal on whether the pipeline generalises within
-    # the training data before committing to a full fit.
-    scoring = "r2" if problem_type_normalized == "regression" else "accuracy"
-    cv_scores = cross_val_score(pipeline, X_train, y_train, cv=5, scoring=scoring)
-    print(  # TODO: replace with logging later
-        f"[train_model] 5-fold CV {scoring} on training split: "
-        f"mean={cv_scores.mean():.4f}, std={cv_scores.std():.4f}"
-    )
-    # --------------------------------------------------------
-    # END STUDENT CODE
-    # --------------------------------------------------------
-
-    # ------------------------------------------------------------------
-    # Fit the Pipeline — ONLY on the training split (leakage boundary)
-    # ------------------------------------------------------------------
-    print(f"[train_model] Fitting pipeline on {len(X_train)} training samples...")  # TODO: replace with logging later
-
+    LOGGER.info("Fitting pipeline on training split only...")
     fitted_pipeline = pipeline.fit(X_train, y_train)
 
-    # ------------------------------------------------------------------
-    # Save the artifact
-    # ------------------------------------------------------------------
+    # -----------------------------
+    # Save artifact
+    # -----------------------------
     os.makedirs(os.path.dirname(model_path) or ".", exist_ok=True)
     joblib.dump(fitted_pipeline, model_path)
-    print(f"[train_model] Artifact saved to '{model_path}'")  # TODO: replace with logging later
+    LOGGER.info("Saved model artifact to %s", model_path)
 
-    print("[train_model] Training complete. Returning fitted Pipeline and test split.")  # TODO: replace with logging later
-
-    return fitted_pipeline, X_test, y_test
+    return fitted_pipeline, X_val, y_val, X_test, y_test

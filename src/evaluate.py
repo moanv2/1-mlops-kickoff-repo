@@ -16,37 +16,40 @@ Returns a single float — the primary evaluation metric — so the caller (src/
 promotion decisions with a simple numerical comparison. As a side-effect, saves a diagnostic plot
 to reports/figures/ and prints a full metrics dictionary to stdout.
 
-TODO: Hardcoded variables will be imported from config.yml later
+TODO: Replace print statements with standard library logging in a later session
+TODO: Any temporary or hardcoded variable or parameter will be imported from config.yml in a later session
+"""
+"""
+evaluate.py
+
+Fixes applied (per project priorities):
+- Use config.yaml (if present) instead of hardcoded constants for reports directory
+- Replace print() with logging
+- Keep REPORTS_DIR global so existing tests can monkeypatch it
 """
 
+from __future__ import annotations
+
 import logging
-import pathlib
+from pathlib import Path
+from typing import Any, Dict
 
 import pandas as pd
+import yaml
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
-try:
-    from sklearn.metrics import f1_score, root_mean_squared_error as _rmse_fn
-
-    def _compute_rmse(y_true, y_pred):
-        return float(_rmse_fn(y_true, y_pred))
-
-except ImportError:
-    import math
-    from sklearn.metrics import f1_score, mean_squared_error as _mse_fn
-
-    def _compute_rmse(y_true, y_pred):
-        return float(math.sqrt(_mse_fn(y_true, y_pred)))
+# Kept for backward compatibility + tests that monkeypatch this
+REPORTS_DIR = Path("reports") / "figures"
 
 
-# TODO: import from config.yml in a later session
-REPORTS_DIR = pathlib.Path("reports") / "figures"
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
+def _load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
+    path = Path(config_path)
+    if not path.exists():
+        LOGGER.info("Config file not found at %s. Using defaults.", config_path)
+        return {}
+    with path.open("r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
 
 
 def evaluate_model(
@@ -54,122 +57,84 @@ def evaluate_model(
     X_test: pd.DataFrame,
     y_test: pd.Series,
     problem_type: str,
+    config_path: str = "config.yaml",
 ) -> float:
     """
-    Inputs:
+    Evaluate a fitted model on a held-out split.
 
-        model        — a fitted sklearn Pipeline (or any estimator) that exposes .predict().
-        X_test       — pd.DataFrame of feature columns, never seen during training.
-        y_test       — pd.Series of ground-truth target values aligned with X_test.
-        problem_type — str, either "regression" or "classification".
-
-    Outputs:
-
-        float — the primary evaluation metric:
-                  "regression"     → RMSE  (lower is better)
-                  "classification" → weighted F1 score (higher is better, range [0, 1])
-        Side-effects:
-                  Prints a full metrics dictionary to stdout.
-                  Saves a diagnostic plot to reports/figures/.
-
-    Why this contract matters for reliable ML delivery:
-
-        Returning a single, well-defined float lets the orchestrator (main.py) make objective,
-        automated promotion decisions (e.g., "deploy only if RMSE < threshold"). The side-effect
-        plots give data scientists the visual diagnostics they need to understand model behaviour
-        without polluting the pipeline's decision-making logic with display code.
+    Returns:
+        float: primary metric
+              - regression: RMSE (lower is better)
+              - classification: weighted F1 (higher is better)
+    Side effects:
+        Saves a diagnostic plot to reports/figures (or config override).
     """
-    logger.info("Starting model evaluation...")
+    cfg = _load_config(config_path)
+    eval_cfg = cfg.get("evaluate", cfg)
 
-    # ------------------------------------------------------------------
-    # Fail-fast guardrails — catch problems before sklearn sees bad data
-    # ------------------------------------------------------------------
+    # Allow config override, else use the module constant (supports monkeypatch in tests)
+    reports_dir = Path(eval_cfg.get("reports_dir", str(REPORTS_DIR)))
+    reports_dir.mkdir(parents=True, exist_ok=True)
 
+    problem_type = problem_type.strip().lower()
+    LOGGER.info("Starting evaluation: problem_type=%s", problem_type)
+
+    # Guardrails
     if not hasattr(model, "predict"):
-        raise ValueError(
-            "Model artifact contract violation: the object passed as 'model' does not expose "
-            "a .predict() method. Pass a fitted sklearn Pipeline or estimator."
-        )
-
+        raise ValueError("Model must implement .predict().")
+    if not isinstance(X_test, pd.DataFrame):
+        raise ValueError("X_test must be a pandas DataFrame.")
     if X_test.empty:
-        raise ValueError(
-            "Guardrail triggered: X_test is empty. Evaluation requires at least one sample."
-        )
-
+        raise ValueError("X_test is empty.")
     if len(X_test) != len(y_test):
         raise ValueError(
-            f"Guardrail triggered: X_test has {len(X_test)} rows but y_test has {len(y_test)} "
-            "entries. They must be the same length."
+            f"Length mismatch: X_test has {len(X_test)} rows but y_test has {len(y_test)} entries."
         )
 
-    # ------------------------------------------------------------------
-    # Predict on untouched test data — model is never modified here
-    # ------------------------------------------------------------------
-
-    logger.info("Running model.predict() on X_test...")
     y_pred = model.predict(X_test)
 
-    # ------------------------------------------------------------------
-    # --------------------------------------------------------
-    # START STUDENT CODE
-    # --------------------------------------------------------
-    # TODO_STUDENT: Paste your notebook logic here to replace or extend the baseline
-    # Why: Every dataset and business context demands different diagnostics. A regression
-    #      problem for house prices needs residual plots and MAE; a fraud-detection classifier
-    #      needs a confusion matrix and precision-recall curves. The baseline below gives you
-    #      one working plot per problem type — extend or swap it for your use case.
-    # Examples:
-    # 1. Regression — swap the residual scatter for a prediction-vs-actual line plot:
-    #       ax.plot(y_test, y_pred, "o", alpha=0.4)
-    #       ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], "r--")
-    # 2. Classification — add a normalised confusion matrix so class imbalance doesn't hide errors:
-    #       cm = confusion_matrix(y_test, y_pred, normalize="true")
-    # Optional forcing function (leave commented):
-    # raise NotImplementedError("Student: You must implement this logic to proceed!")
-    # ------------------------------------------------------------------
-
-    import matplotlib  # import here so matplotlib is not a hard top-level dependency
-    matplotlib.use("Agg")  # non-interactive backend — safe inside a pipeline
+    # Plotting (non-interactive backend)
+    import matplotlib
+    matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-
     if problem_type == "regression":
-        from sklearn.metrics import mean_absolute_error, r2_score
+        from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-        metrics = {
-            "rmse": _compute_rmse(y_test, y_pred),
-            "mae": float(mean_absolute_error(y_test, y_pred)),
-            "r2": float(r2_score(y_test, y_pred)),
-        }
-        logger.info("Metrics: %s", metrics)
+        rmse = float(mean_squared_error(y_test, y_pred, squared=False))
+        mae = float(mean_absolute_error(y_test, y_pred))
+        r2 = float(r2_score(y_test, y_pred))
+        LOGGER.info("Regression metrics: rmse=%.6f mae=%.6f r2=%.6f", rmse, mae, r2)
 
-        # Residual plot: shows where predictions are systematically wrong
-        residuals = [float(a) - float(p) for a, p in zip(y_test, y_pred)]
+        residuals = (
+            pd.Series(y_test).astype(float).to_numpy()
+            - pd.Series(y_pred).astype(float).to_numpy()
+        )
+
         fig, ax = plt.subplots()
         ax.scatter(y_pred, residuals, alpha=0.4)
-        ax.axhline(0, color="red", linewidth=1, linestyle="--")
+        ax.axhline(0, linewidth=1, linestyle="--")
         ax.set_xlabel("Predicted value")
-        ax.set_ylabel("Residual  (actual − predicted)")
+        ax.set_ylabel("Residual (actual − predicted)")
         ax.set_title("Residual Plot")
         fig.tight_layout()
-        plot_path = REPORTS_DIR / "residual_plot.png"
+
+        plot_path = reports_dir / "residual_plot.png"
         fig.savefig(plot_path)
         plt.close(fig)
-        logger.info("Saved residual plot -> %s", plot_path)
+        LOGGER.info("Saved residual plot to %s", plot_path)
 
-    elif problem_type == "classification":
-        from sklearn.metrics import classification_report, confusion_matrix
+        return rmse
 
-        metrics = {
-            "f1_weighted": float(f1_score(y_test, y_pred, average="weighted")),
-        }
-        report = classification_report(y_test, y_pred)
-        logger.info("Metrics: %s", metrics)
-        logger.info("Classification Report:\n%s", report)
+    if problem_type == "classification":
+        from sklearn.metrics import classification_report, confusion_matrix, f1_score
 
-        # Confusion matrix plot: rows = true labels, columns = predicted labels
+        f1w = float(f1_score(y_test, y_pred, average="weighted"))
+        LOGGER.info("Classification metric: f1_weighted=%.6f", f1w)
+        LOGGER.info("Classification report:\n%s", classification_report(y_test, y_pred))
+
         cm = confusion_matrix(y_test, y_pred)
+
         fig, ax = plt.subplots()
         im = ax.imshow(cm, interpolation="nearest", cmap="Blues")
         fig.colorbar(im, ax=ax)
@@ -177,32 +142,14 @@ def evaluate_model(
         ax.set_ylabel("True label")
         ax.set_title("Confusion Matrix")
         fig.tight_layout()
-        plot_path = REPORTS_DIR / "confusion_matrix.png"
+
+        plot_path = reports_dir / "confusion_matrix.png"
         fig.savefig(plot_path)
         plt.close(fig)
-        logger.info("Saved confusion matrix -> %s", plot_path)
+        LOGGER.info("Saved confusion matrix to %s", plot_path)
 
-    # --------------------------------------------------------
-    # END STUDENT CODE
-    # --------------------------------------------------------
-    # ------------------------------------------------------------------
+        return f1w
 
-    # ------------------------------------------------------------------
-    # Return single primary metric for pipeline promotion decisions
-    # ------------------------------------------------------------------
-
-    if problem_type == "regression":
-        metric_value = _compute_rmse(y_test, y_pred)
-        logger.info("RMSE=%.4f", metric_value)
-
-    elif problem_type == "classification":
-        metric_value = float(f1_score(y_test, y_pred, average="weighted"))
-        logger.info("F1_weighted=%.4f", metric_value)
-
-    else:
-        raise ValueError(
-            f"Unknown problem_type='{problem_type}'. Expected 'regression' or 'classification'."
-        )
-
-    logger.info("Evaluation complete.")
-    return metric_value
+    raise ValueError(
+        f"Unknown problem_type='{problem_type}'. Expected 'regression' or 'classification'."
+    )

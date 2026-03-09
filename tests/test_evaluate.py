@@ -9,11 +9,6 @@ from sklearn.pipeline import Pipeline
 from src.evaluate import evaluate_model
 
 
-# ---------------------------------------------------------------------------
-# Shared fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture()
 def regression_fixtures():
     """Fitted LinearRegression pipeline + aligned X_test / y_test."""
@@ -31,14 +26,9 @@ def classification_fixtures():
     rng = np.random.default_rng(1)
     X = pd.DataFrame({"a": rng.random(40), "b": rng.random(40)})
     y = pd.Series((X["a"] > 0.5).astype(int))
-    pipeline = Pipeline([("model", LogisticRegression())])
+    pipeline = Pipeline([("model", LogisticRegression(max_iter=500))])
     pipeline.fit(X, y)
     return pipeline, X, y
-
-
-# ---------------------------------------------------------------------------
-# Happy-path tests
-# ---------------------------------------------------------------------------
 
 
 class TestEvaluateModel:
@@ -79,11 +69,6 @@ class TestEvaluateModel:
         assert (tmp_path / "confusion_matrix.png").exists()
 
 
-# ---------------------------------------------------------------------------
-# Guardrail tests
-# ---------------------------------------------------------------------------
-
-
 class TestEvaluateModelGuardrails:
     def test_raises_if_model_has_no_predict(self):
         X = pd.DataFrame({"a": [1, 2, 3]})
@@ -101,7 +86,7 @@ class TestEvaluateModelGuardrails:
     def test_raises_on_length_mismatch(self, regression_fixtures):
         model, X, y = regression_fixtures
         y_short = y.iloc[:-5]
-        with pytest.raises(ValueError, match="same length"):
+        with pytest.raises(ValueError, match="Length mismatch"):
             evaluate_model(model, X, y_short, "regression")
 
     def test_raises_on_unknown_problem_type(self, regression_fixtures):
