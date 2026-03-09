@@ -1,10 +1,66 @@
 # MLOps Project Configuration
-# This file will eventually control paths, hyperparameters, and toggles.
+# Centralizes all paths, parameters, and settings for the ML pipeline.
 
+# ── Data Paths ────────────────────────────────────────────────
 data:
-  raw: "data/raw/dataset.csv"
+  raw: "data/raw/telecom_churn.csv"
   processed: "data/processed/clean.csv"
+  inference_output: "data/inference/predictions.csv"
 
+# ── Model Artifact ────────────────────────────────────────────
+model:
+  path: "models/model.pkl"
+  problem_type: "classification"   # "classification" or "regression"
+
+# ── Target & Features ─────────────────────────────────────────
+target:
+  column: "churn"                  # lowercase after clean_data standardizes names
+
+features:
+  numeric:
+    - accountweeks
+    - datausage
+    - custservcalls
+    - daymins
+    - daycalls
+    - monthlycharge
+    - overagefee
+    - roammins
+  categorical:
+    - contractrenewal
+    - dataplan
+
+# ── Validation ────────────────────────────────────────────────
+validation:
+  required_columns:
+    - AccountWeeks
+    - DataUsage
+    - CustServCalls
+    - DayMins
+    - DayCalls
+    - MonthlyCharge
+    - OverageFee
+    - RoamMins
+    - Churn
+    - ContractRenewal
+    - DataPlan
+  non_negative_cols:
+    - AccountWeeks
+    - DataUsage
+    - CustServCalls
+    - DayMins
+    - DayCalls
+    - MonthlyCharge
+    - OverageFee
+    - RoamMins
+  binary_cols:
+    - ContractRenewal
+    - DataPlan
+    - Churn
+
+# ── Training ──────────────────────────────────────────────────
 train:
+  problem_type: "classification"
+  model_path: "models/model.pkl"
   test_size: 0.2
   seed: 42
