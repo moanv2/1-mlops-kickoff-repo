@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Educational Goal:
 
@@ -28,9 +30,8 @@ Fixes applied (per project priorities):
 - Keep REPORTS_DIR global so existing tests can monkeypatch it
 """
 
-from __future__ import annotations
-
 import logging
+import math
 from pathlib import Path
 from typing import Any, Dict
 
@@ -41,6 +42,18 @@ LOGGER = logging.getLogger(__name__)
 
 # Kept for backward compatibility + tests that monkeypatch this
 REPORTS_DIR = Path("reports") / "figures"
+
+try:
+    from sklearn.metrics import root_mean_squared_error as _rmse_fn
+
+    def _compute_rmse(y_true, y_pred):
+        return float(_rmse_fn(y_true, y_pred))
+
+except ImportError:
+    from sklearn.metrics import mean_squared_error as _mse_fn
+
+    def _compute_rmse(y_true, y_pred):
+        return float(math.sqrt(_mse_fn(y_true, y_pred)))
 
 
 def _load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
@@ -72,8 +85,8 @@ def evaluate_model(
     cfg = _load_config(config_path)
     eval_cfg = cfg.get("evaluate", cfg)
 
-    # Allow config override, else use the module constant (supports monkeypatch in tests)
-    reports_dir = Path(eval_cfg.get("reports_dir", str(REPORTS_DIR)))
+    # Use the module-level REPORTS_DIR directly (supports monkeypatch in tests).
+    reports_dir = REPORTS_DIR
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     problem_type = problem_type.strip().lower()
@@ -88,7 +101,8 @@ def evaluate_model(
         raise ValueError("X_test is empty.")
     if len(X_test) != len(y_test):
         raise ValueError(
-            f"Length mismatch: X_test has {len(X_test)} rows but y_test has {len(y_test)} entries."
+            f"Length mismatch: X_test has {len(X_test)} rows but y_test has {len(y_test)} entries. "
+            "They must be the same length."
         )
 
     y_pred = model.predict(X_test)
@@ -99,9 +113,9 @@ def evaluate_model(
     import matplotlib.pyplot as plt
 
     if problem_type == "regression":
-        from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+        from sklearn.metrics import mean_absolute_error, r2_score
 
-        rmse = float(mean_squared_error(y_test, y_pred, squared=False))
+        rmse = _compute_rmse(y_test, y_pred)
         mae = float(mean_absolute_error(y_test, y_pred))
         r2 = float(r2_score(y_test, y_pred))
         LOGGER.info("Regression metrics: rmse=%.6f mae=%.6f r2=%.6f", rmse, mae, r2)

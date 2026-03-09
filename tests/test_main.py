@@ -121,7 +121,7 @@ class TestPipelineIntegration:
         # Train
         model_path = str(tmp_path / "model.pkl")
         preprocessor = FunctionTransformer()
-        pipeline, X_test, y_test = train_model(
+        pipeline, X_val, y_val, X_test, y_test = train_model(
             X, y, preprocessor, PROBLEM_TYPE, model_path
         )
 
