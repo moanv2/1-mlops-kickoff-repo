@@ -10,7 +10,7 @@ import pandas as pd
 
 
 
-def clean_data(df=pd.DataFrame)-> pd.DataFrame:
+def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     '''
     Clean raw dataset and return a clean DataFrame.
     '''
@@ -38,6 +38,3 @@ def clean_data(df=pd.DataFrame)-> pd.DataFrame:
 
     return df
 
-if __name__ == "__main__":
-    clean_data(df)
-    print(df.head())
