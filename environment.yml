@@ -12,3 +12,7 @@ dependencies:
   - joblib
   - matplotlib
   - jupyter
+  - pyyaml
+  - pytest
+  - pytest-cov
+  - flake8
