@@ -12,6 +12,12 @@ import sys
 import pandas as pd
 import pytest
 
+from src.main import (
+    REQUIRED_COLUMNS,
+    TARGET_COL,
+    PROBLEM_TYPE,
+    MODEL_PATH,
+)
 from src.clean_data import clean_data
 from src.validate import validate_dataframe
 from src.feature_engineering import build_features, FeatureConfig
@@ -19,17 +25,6 @@ from src.train import train_model
 from src.evaluate import evaluate_model
 from src.infer import run_inference
 from sklearn.preprocessing import FunctionTransformer
-
-
-# -- Constants matching main.py (test that they stay in sync) --
-REQUIRED_COLUMNS = [
-    "AccountWeeks", "DataUsage", "CustServCalls",
-    "DayMins", "DayCalls", "MonthlyCharge",
-    "OverageFee", "RoamMins", "Churn",
-    "ContractRenewal", "DataPlan",
-]
-TARGET_COL = "churn"
-PROBLEM_TYPE = "classification"
 
 
 def _make_raw_df(n=80):

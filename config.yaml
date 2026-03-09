@@ -47,5 +47,7 @@ validation:
 
 # ── Training ──────────────────────────────────────────────────
 train:
+  problem_type: "classification"
+  model_path: "models/model.pkl"
   test_size: 0.2
   seed: 42
