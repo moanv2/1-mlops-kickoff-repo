@@ -24,13 +24,8 @@ def clean_data(df=pd.DataFrame)-> pd.DataFrame:
     )
     #Trim whitespaces
     obj_cols= df.select_dtypes(include="object").columns
-    if len(obj_cols) >0:
-        df[obj_cols]=(
-                      df[obj_cols]
-                      .apply(
-                          lambda x: x.str.strip()
-                                         )
-                      )
+    for col in obj_cols:
+        df[col] = df[col].str.strip()
     
     #Drop exact duplicates rows
     df=df.drop_duplicates()

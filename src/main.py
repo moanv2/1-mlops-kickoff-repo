@@ -21,47 +21,58 @@ CONFIG_PATH = Path("config.yaml")
 with open(CONFIG_PATH) as f:
     config = yaml.safe_load(f)
 
-REQUIRED_COLUMNS = config["validate"]["required_columns"]
-TARGET_COL = config["features"]["target_col"]
-NUMERIC_COLS = config["features"]["numeric_cols"]
-CATEGORICAL_COLS = config["features"]["categorical_cols"]
+REQUIRED_COLUMNS = config["validation"]["required_columns"]
+TARGET_COL = config["target"]["column"]
+NUMERIC_COLS = config["features"]["numeric"]
+CATEGORICAL_COLS = config["features"]["categorical"]
 PROBLEM_TYPE = config["train"]["problem_type"]
 MODEL_PATH = config["train"]["model_path"]
 
-if __name__ == "__main__":
+
+def run_pipeline(config: dict) -> float:
+    """Run the full ML pipeline. Returns the evaluation metric."""
     # Step 1: Load data
     df = load_data(Path(config["data"]["raw"]))
 
     # Step 2: Validate (before cleaning — columns still have original casing)
-    validate_dataframe(df, REQUIRED_COLUMNS)
+    validate_dataframe(df, config["validation"]["required_columns"])
 
     # Step 3: Clean
     df = clean_data(df)
 
     # Step 4: Feature engineering (columns are now lowercase)
     cfg = FeatureConfig(
-        target_col=TARGET_COL,
-        numeric_cols=tuple(NUMERIC_COLS),
-        categorical_cols=tuple(CATEGORICAL_COLS),
+        target_col=config["target"]["column"],
+        numeric_cols=tuple(config["features"]["numeric"]),
+        categorical_cols=tuple(config["features"]["categorical"]),
     )
     df = build_features(df, cfg)
 
     # Step 5: Split features and target
-    y = df[TARGET_COL]
-    X = df.drop(columns=[TARGET_COL])
+    target_col = config["target"]["column"]
+    y = df[target_col]
+    X = df.drop(columns=[target_col])
 
     # Step 6: Train (FunctionTransformer passes features through — already engineered above)
     preprocessor = FunctionTransformer()
     fitted_pipeline, X_test, y_test = train_model(
-        X, y, preprocessor, PROBLEM_TYPE, MODEL_PATH,
+        X, y, preprocessor,
+        config["train"]["problem_type"],
+        config["train"]["model_path"],
         test_size=config["train"]["test_size"],
         random_state=config["train"]["seed"],
     )
 
     # Step 7: Evaluate
-    metric = evaluate_model(fitted_pipeline, X_test, y_test, PROBLEM_TYPE)
-    print(f"Pipeline complete. {PROBLEM_TYPE} metric: {metric:.4f}")
+    metric = evaluate_model(fitted_pipeline, X_test, y_test, config["train"]["problem_type"])
+    print(f"Pipeline complete. {config['train']['problem_type']} metric: {metric:.4f}")
 
     # Step 8: Infer
     predictions = run_inference(fitted_pipeline, X_test)
     print(predictions.head())
+
+    return metric
+
+
+if __name__ == "__main__":
+    run_pipeline(config)
