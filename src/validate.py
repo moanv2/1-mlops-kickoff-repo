@@ -19,7 +19,7 @@ _CONFIG_PATH = pathlib.Path(__file__).parent.parent / "config.yaml"
 with open(_CONFIG_PATH, "r") as _f:
     _config = yaml.safe_load(_f)
 
-_validate_cfg = _config.get("validate", {})
+_validate_cfg = _config.get("validation", {})
 
 
 def validate_dataframe(df: pd.DataFrame, required_columns: list) -> bool:

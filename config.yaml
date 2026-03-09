@@ -44,6 +44,19 @@ validation:
     - Churn
     - ContractRenewal
     - DataPlan
+  non_negative_cols:
+    - AccountWeeks
+    - DataUsage
+    - CustServCalls
+    - DayMins
+    - DayCalls
+    - MonthlyCharge
+    - OverageFee
+    - RoamMins
+  binary_cols:
+    - ContractRenewal
+    - DataPlan
+    - Churn
 
 # ── Training ──────────────────────────────────────────────────
 train:
