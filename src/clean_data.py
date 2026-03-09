@@ -31,18 +31,8 @@ def clean_data(df=pd.DataFrame)-> pd.DataFrame:
     df=df.drop_duplicates()
 
     #Standardizing missing values
-    df = df.replace(
-        ["NA",
-         "N/A",
-         "",
-         "?",
-         "null",
-         "None",
-         "missing",
-         -999,
-         ],
-        pd.NA
-        )
+    _SENTINEL = ["NA", "N/A", "", "?", "null", "None", "missing", -999]
+    df = df.replace({val: pd.NA for val in _SENTINEL})
     
 
 
