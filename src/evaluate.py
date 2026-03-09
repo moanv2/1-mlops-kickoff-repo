@@ -1,34 +1,27 @@
-from __future__ import annotations
-
 """
+evaluate.py — Model evaluation gate.
+
 Educational Goal:
+    Evaluation decides whether a trained model is good enough to move forward
+    in the pipeline. Without a dedicated, isolated evaluation step, it is easy
+    to accidentally leak information from the test set into training.
 
-Why this module exists in an MLOps system: Evaluation is the gate that decides whether a trained
-model is good enough to move forward in the pipeline (to registration, deployment, or A/B testing).
-Without a dedicated, isolated evaluation step, it is easy to accidentally leak information from the
-test set into training, producing optimistic metrics that do not reflect real-world performance.
+Responsibility:
+    Measures how well a fitted model performs on held-out data AND produces
+    diagnostic plots saved to reports/figures/. Does NOT load data and does NOT
+    train or modify the model.
 
-Responsibility (separation of concerns): This module measures how well a fitted model performs on
-held-out data AND produces diagnostic plots saved to reports/figures/. It does NOT load data and
-does NOT train or modify the model — those concerns belong to ingest.py and train.py respectively.
+Pipeline contract:
+    Receives a fitted sklearn Pipeline, X_test, y_test, and problem_type.
+    Returns a single float (the primary metric) so the caller can make
+    promotion decisions with a simple numerical comparison.
 
-Pipeline contract (inputs and outputs): Receives a fitted sklearn Pipeline object, a feature
-DataFrame (X_test), a target Series (y_test), and a string that declares the problem type.
-Returns a single float — the primary evaluation metric — so the caller (src/main.py) can make
-promotion decisions with a simple numerical comparison. As a side-effect, saves a diagnostic plot
-to reports/figures/ and prints a full metrics dictionary to stdout.
-
-TODO: Replace print statements with standard library logging in a later session
-TODO: Any temporary or hardcoded variable or parameter will be imported from config.yml in a later session
+Fixes applied:
+    - Use config.yaml (if present) for reports directory
+    - Replace print() with logging
+    - Keep REPORTS_DIR global so existing tests can monkeypatch it
 """
-"""
-evaluate.py
-
-Fixes applied (per project priorities):
-- Use config.yaml (if present) instead of hardcoded constants for reports directory
-- Replace print() with logging
-- Keep REPORTS_DIR global so existing tests can monkeypatch it
-"""
+from __future__ import annotations
 
 import logging
 import math
@@ -75,15 +68,16 @@ def evaluate_model(
     """
     Evaluate a fitted model on a held-out split.
 
-    Returns:
-        float: primary metric
-              - regression: RMSE (lower is better)
-              - classification: weighted F1 (higher is better)
-    Side effects:
-        Saves a diagnostic plot to reports/figures (or config override).
+    Returns
+    -------
+    float
+        Primary metric: RMSE (regression) or weighted F1 (classification).
+
+    Side effects
+    ------------
+    Saves a diagnostic plot to reports/figures/.
     """
-    cfg = _load_config(config_path)
-    eval_cfg = cfg.get("evaluate", cfg)
+    _load_config(config_path)
 
     # Use the module-level REPORTS_DIR directly (supports monkeypatch in tests).
     reports_dir = REPORTS_DIR
@@ -101,7 +95,8 @@ def evaluate_model(
         raise ValueError("X_test is empty.")
     if len(X_test) != len(y_test):
         raise ValueError(
-            f"Length mismatch: X_test has {len(X_test)} rows but y_test has {len(y_test)} entries. "
+            f"Length mismatch: X_test has {len(X_test)} rows "
+            f"but y_test has {len(y_test)} entries. "
             "They must be the same length."
         )
 
@@ -129,7 +124,7 @@ def evaluate_model(
         ax.scatter(y_pred, residuals, alpha=0.4)
         ax.axhline(0, linewidth=1, linestyle="--")
         ax.set_xlabel("Predicted value")
-        ax.set_ylabel("Residual (actual − predicted)")
+        ax.set_ylabel("Residual (actual - predicted)")
         ax.set_title("Residual Plot")
         fig.tight_layout()
 
@@ -145,7 +140,10 @@ def evaluate_model(
 
         f1w = float(f1_score(y_test, y_pred, average="weighted"))
         LOGGER.info("Classification metric: f1_weighted=%.6f", f1w)
-        LOGGER.info("Classification report:\n%s", classification_report(y_test, y_pred))
+        LOGGER.info(
+            "Classification report:\n%s",
+            classification_report(y_test, y_pred),
+        )
 
         cm = confusion_matrix(y_test, y_pred)
 
@@ -165,5 +163,6 @@ def evaluate_model(
         return f1w
 
     raise ValueError(
-        f"Unknown problem_type='{problem_type}'. Expected 'regression' or 'classification'."
+        f"Unknown problem_type='{problem_type}'. "
+        "Expected 'regression' or 'classification'."
     )

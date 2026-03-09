@@ -1,8 +1,12 @@
 """
-Educational Goal:
-- Why this module exists in an MLOps system: Provide a deployment-like prediction interface separate from training and evaluation.
-- Responsibility (separation of concerns): Run model.predict on new data and return a standardized predictions DataFrame.
-- Pipeline contract (inputs and outputs): Input fitted model + features; output DataFrame with one column "prediction".
+Module: Inference
+-----------------
+Role: Provide a deployment-like prediction interface separate from training
+    and evaluation.
+Responsibility: Run model.predict on new data and return a standardized
+    predictions DataFrame.
+Pipeline contract: Input fitted model + features; output DataFrame with
+    one column 'prediction'.
 """
 
 import pandas as pd
