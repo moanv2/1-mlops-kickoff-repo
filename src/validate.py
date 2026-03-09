@@ -1,10 +1,10 @@
 """
-Educational Goal:
-- Why this module exists in an MLOps system: Data validation acts as a quality gate between ingestion and training (GIGO).
-- Responsibility (separation of concerns): Check schema/quality only. Do NOT clean, transform, or load data.
-- Pipeline contract (inputs and outputs): Receives a DataFrame + required columns. Returns True or raises ValueError (fail-fast).
-
-TODO: Any temporary or hardcoded variable or parameter will be imported from config.yml in a later session
+Module: Data Validation
+-----------------------
+Role: Quality gate between ingestion and training (GIGO).
+Responsibility: Check schema/quality only. Do NOT clean, transform, or load.
+Pipeline contract: Receives a DataFrame + required columns. Returns True or
+    raises ValueError (fail-fast).
 """
 
 import logging

@@ -1,9 +1,10 @@
 """
-Role: Doing feature engineering
+Module: Feature Engineering
+---------------------------
+Role: Centralize feature creation, encoding, and scaling.
+Input: pandas.DataFrame (cleaned) + FeatureConfig.
+Output: pandas.DataFrame with engineered features.
 """
-
-
-
 from __future__ import annotations
 
 import argparse
@@ -81,6 +82,7 @@ def build_features(df: pd.DataFrame, cfg: FeatureConfig) -> pd.DataFrame:
 
 
 def main() -> None:
+    """CLI entrypoint for standalone feature engineering."""
     parser = argparse.ArgumentParser(description="Run feature engineering and save output.")
     parser.add_argument("--input", required=True, help="Path to input CSV")
     parser.add_argument("--output", required=True, help="Path to output CSV")
