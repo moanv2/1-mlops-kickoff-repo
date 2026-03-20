@@ -1,6 +1,18 @@
 # MLOps Project Configuration
 # Centralizes all paths, parameters, and settings for the ML pipeline.
 
+# ── Weights & Biases ─────────────────────────────────────────
+wandb:
+  project: "MLOPs-Group5-telecomChurn"
+  entity: "diego08-ie-university"
+  job_type: "training-pipeline"
+  model_artifact: "telecom-churn-model"
+
+# ── Logging ──────────────────────────────────────────────────
+logging:
+  log_file: "logs/pipeline.log"
+  level: "INFO"
+
 # ── Data Paths ────────────────────────────────────────────────
 data:
   raw: "data/raw/telecom_churn.csv"
@@ -58,9 +70,23 @@ validation:
     - DataPlan
     - Churn
 
+# ── Cleaning ─────────────────────────────────────────────────
+cleaning:
+  sentinel_values: ["NA", "N/A", "", "?", "null", "None", "missing", -999]
+
+# ── Reports ──────────────────────────────────────────────────
+reports:
+  figures_dir: "reports/figures"
+
 # ── Training ──────────────────────────────────────────────────
 train:
   problem_type: "classification"
   model_path: "models/model.pkl"
   test_size: 0.2
+  val_size: 0.2
   seed: 42
+  model_params:
+    classification:
+      solver: "liblinear"
+      max_iter: 500
+    regression: {}

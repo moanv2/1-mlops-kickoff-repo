@@ -9,6 +9,7 @@ Pipeline contract: Receives a DataFrame + required columns. Returns True or
 
 import logging
 import pathlib
+
 import pandas as pd
 import yaml
 
@@ -55,8 +56,6 @@ def validate_dataframe(df: pd.DataFrame, required_columns: list) -> bool:
     # --------------------------------------------------------
     # START STUDENT CODE
     # --------------------------------------------------------
-    # Student checks (kept), but guarded to avoid breaking other datasets/scaffolding.
-
     # Check 1: Missing values (simple + safer: only required columns)
     for col in required_columns:
         if df[col].isnull().any():

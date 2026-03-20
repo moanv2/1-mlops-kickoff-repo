@@ -3,7 +3,6 @@ Module: Data Loading
 --------------------
 Role: Load the raw telecom churn dataset with validation and logging.
 Usage: from src.load_data import load_data
-Written by: Diego (if you have any questions ask me)
 """
 
 import logging
@@ -11,15 +10,13 @@ from pathlib import Path
 
 import pandas as pd
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 RAW_DATA_PATH = Path("data/raw/telecom_churn.csv")
 
 
 def load_csv(path: Path) -> pd.DataFrame:
-    """Centralized CSV loader with error handling (Steps 4 & 5)."""
+    """Centralized CSV loader with error handling."""
     raw = Path(path).read_bytes()
     if b"\x00" in raw:
         raise RuntimeError(
@@ -79,8 +76,3 @@ def load_data(path: Path = RAW_DATA_PATH) -> pd.DataFrame:
                 df.shape[1])
 
     return df
-
-
-if __name__ == "__main__":
-    df = load_data()
-    print(df.head())

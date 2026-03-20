@@ -147,15 +147,18 @@ def train_model(
     LOGGER.info("Split sizes: train=%d val=%d test=%d", len(X_train), len(X_val), len(X_test))
 
     # -----------------------------
-    # Model selection
+    # Model selection (params from config)
     # -----------------------------
+    model_params_cfg = train_cfg.get("model_params", {})
+
     if problem_type_normalized == "regression":
-        estimator = Ridge(random_state=random_state)
+        reg_params = model_params_cfg.get("regression", {})
+        estimator = Ridge(random_state=random_state, **reg_params)
     elif problem_type_normalized == "classification":
+        cls_params = model_params_cfg.get("classification", {})
         estimator = LogisticRegression(
-            solver="liblinear",
-            max_iter=500,
             random_state=random_state,
+            **cls_params,
         )
     else:
         raise ValueError("Unsupported problem_type. Expected 'regression' or 'classification'.")

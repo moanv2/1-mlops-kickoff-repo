@@ -8,11 +8,14 @@ Output: pandas.DataFrame with engineered features.
 from __future__ import annotations
 
 import argparse
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -29,7 +32,7 @@ def _parse_dates(df: pd.DataFrame, date_cols: Iterable[str]) -> pd.DataFrame:
     df = df.copy()
     for col in date_cols:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce")
+            df[col] = pd.to_datetime(df[col], errors="coerce", format="mixed")
             df[f"{col}_year"] = df[col].dt.year
             df[f"{col}_month"] = df[col].dt.month
             df[f"{col}_day"] = df[col].dt.day
@@ -106,7 +109,7 @@ def main() -> None:
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     features.to_csv(out_path, index=False)
-    print(f"Saved features to: {out_path} (shape={features.shape})")
+    logger.info("Saved features to: %s (shape=%s)", out_path, features.shape)
 
 
 if __name__ == "__main__":

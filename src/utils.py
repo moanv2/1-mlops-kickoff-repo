@@ -3,11 +3,9 @@ Module: Shared Utilities
 ------------------------
 Role: Provide common helpers used across pipeline modules.
     - load_config(): read config.yaml into a dict
-    - setup_logger(): consistent logging for every module
     - get_project_root(): resolve the repo root path
 """
 
-import logging
 import pathlib
 
 import yaml
@@ -51,31 +49,3 @@ def load_config(path: str | pathlib.Path | None = None) -> dict:
         config = yaml.safe_load(f)
 
     return config or {}
-
-
-def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
-    """Return a logger with a consistent format.
-
-    Calling this multiple times with the same *name* returns the same
-    logger instance (standard ``logging`` behaviour), so it is safe
-    to call from every module's top level.
-
-    Parameters
-    ----------
-    name : str
-        Logger name — pass ``__name__`` from the calling module.
-    level : int, optional
-        Logging level (default ``logging.INFO``).
-    """
-    logger = logging.getLogger(name)
-
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-
-    logger.setLevel(level)
-    return logger
