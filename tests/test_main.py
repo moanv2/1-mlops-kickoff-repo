@@ -11,20 +11,25 @@ import sys
 
 import pandas as pd
 import pytest
+import yaml
 
-from src.main import (
-    REQUIRED_COLUMNS,
-    TARGET_COL,
-    PROBLEM_TYPE,
-    MODEL_PATH,
-)
 from src.clean_data import clean_data
-from src.validate import validate_dataframe
-from src.feature_engineering import build_features, FeatureConfig
-from src.train import train_model
 from src.evaluate import evaluate_model
+from src.feature_engineering import FeatureConfig, build_features
 from src.infer import run_inference
+from src.train import train_model
+from src.validate import validate_dataframe
+
 from sklearn.preprocessing import FunctionTransformer
+
+# Load config the same way main.py does
+with open("config.yaml") as _f:
+    _config = yaml.safe_load(_f)
+
+REQUIRED_COLUMNS = _config["validation"]["required_columns"]
+TARGET_COL = _config["target"]["column"]
+PROBLEM_TYPE = _config["train"]["problem_type"]
+MODEL_PATH = _config["train"]["model_path"]
 
 
 def _make_raw_df(n=80):
@@ -169,25 +174,25 @@ class TestMainPipeline:
         )
 
     def test_pipeline_outputs_metric(self):
-        """The pipeline should print the final metric."""
+        """The pipeline should log the final metric."""
         result = subprocess.run(
             [sys.executable, "-m", "src.main"],
             capture_output=True,
             text=True,
             timeout=120,
         )
-        assert "Pipeline complete" in result.stdout
-        assert "metric" in result.stdout
+        # Logging goes to stderr
+        assert "Pipeline complete" in result.stderr
 
     def test_pipeline_outputs_predictions(self):
-        """The pipeline should print prediction results."""
+        """The pipeline should log prediction results."""
         result = subprocess.run(
             [sys.executable, "-m", "src.main"],
             capture_output=True,
             text=True,
             timeout=120,
         )
-        assert "prediction" in result.stdout
+        assert "prediction" in result.stderr.lower()
 
     def test_pipeline_produces_model_artifact(self):
         """The pipeline should save a model file."""

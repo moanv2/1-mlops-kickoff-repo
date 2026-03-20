@@ -1,11 +1,6 @@
 """
 evaluate.py — Model evaluation gate.
 
-Educational Goal:
-    Evaluation decides whether a trained model is good enough to move forward
-    in the pipeline. Without a dedicated, isolated evaluation step, it is easy
-    to accidentally leak information from the test set into training.
-
 Responsibility:
     Measures how well a fitted model performs on held-out data AND produces
     diagnostic plots saved to reports/figures/. Does NOT load data and does NOT
@@ -15,11 +10,6 @@ Pipeline contract:
     Receives a fitted sklearn Pipeline, X_test, y_test, and problem_type.
     Returns a single float (the primary metric) so the caller can make
     promotion decisions with a simple numerical comparison.
-
-Fixes applied:
-    - Use config.yaml (if present) for reports directory
-    - Replace print() with logging
-    - Keep REPORTS_DIR global so existing tests can monkeypatch it
 """
 from __future__ import annotations
 
@@ -33,8 +23,15 @@ import yaml
 
 LOGGER = logging.getLogger(__name__)
 
-# Kept for backward compatibility + tests that monkeypatch this
-REPORTS_DIR = Path("reports") / "figures"
+
+def _load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
+    path = Path(config_path)
+    if not path.exists():
+        LOGGER.info("Config file not found at %s. Using defaults.", config_path)
+        return {}
+    with path.open("r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
 
 try:
     from sklearn.metrics import root_mean_squared_error as _rmse_fn
@@ -47,15 +44,6 @@ except ImportError:
 
     def _compute_rmse(y_true, y_pred):
         return float(math.sqrt(_mse_fn(y_true, y_pred)))
-
-
-def _load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
-    path = Path(config_path)
-    if not path.exists():
-        LOGGER.info("Config file not found at %s. Using defaults.", config_path)
-        return {}
-    with path.open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
 
 
 def evaluate_model(
@@ -77,10 +65,8 @@ def evaluate_model(
     ------------
     Saves a diagnostic plot to reports/figures/.
     """
-    _load_config(config_path)
-
-    # Use the module-level REPORTS_DIR directly (supports monkeypatch in tests).
-    reports_dir = REPORTS_DIR
+    cfg = _load_config(config_path)
+    reports_dir = Path(cfg.get("reports", {}).get("figures_dir", "reports/figures"))
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     problem_type = problem_type.strip().lower()

@@ -1,0 +1,13 @@
+# Pinned production dependencies (derived from conda-lock.yml environment)
+# Used by Dockerfile for reproducible builds
+pandas==2.2.3
+numpy==2.2.3
+scikit-learn==1.8.0
+joblib==1.5.3
+matplotlib==3.10.8
+PyYAML==6.0.3
+python-dotenv==1.2.2
+wandb==0.19.11
+fastapi==0.135.1
+uvicorn[standard]==0.42.0
+pydantic==2.12.5
