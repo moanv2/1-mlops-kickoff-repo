@@ -9,6 +9,12 @@ __pycache__/
 env/
 venv/
 
+# Logs
+logs/
+
+# W&B
+wandb/
+
 # Tooling
 .pytest_cache/
 .mypy_cache/

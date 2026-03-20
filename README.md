@@ -2,8 +2,8 @@
 
 **Author:** Group 5
 **Course:** MLOps Engineering - MsC in Business Analytics and Data Science (IE University)
-**Date:** February 2026
-**Status:** 1st Group Assignment - Phase 1
+**Date:** March 2026
+**Status:** Final Group Assignment
 
 ---
 
@@ -107,24 +107,31 @@ This project follows a strict separation between "Sandbox" (Notebooks) and "Prod
 
 ```text
 .
-├── README.md                       # Project definition and business case
+├── README.md                       # Project documentation, model card, changelog
+├── config.yaml                     # Centralized runtime configuration
+├── environment.yml                 # Conda environment specification
 ├── pytest.ini                      # Pytest configuration
-├── environment.yml                 # Dependencies (Conda)
-├── config.yaml                     # Global configuration (paths, params, features)
+├── Dockerfile                      # Lean serving container
+├── .dockerignore                   # Strict Docker ignore policy
+├── .env.example                    # Template for secrets (WANDB_API_KEY)
 │
-├── notebooks/                      # Experimental sandbox
-│   └── 01_opioid_analysis_vExp.ipynb
+├── .github/workflows/
+│   ├── ci.yml                      # CI: runs tests on Pull Requests
+│   └── deploy.yml                  # CD: deploys on GitHub Release
 │
 ├── src/                            # Production code
 │   ├── __init__.py                 # Python package marker
+│   ├── logger.py                   # Centralized dual-output logger (console + file)
+│   ├── utils.py                    # Shared helpers (load_config, get_project_root)
 │   ├── load_data.py                # Data ingestion with validation and logging
 │   ├── clean_data.py               # Column standardization, dedup, missing values
 │   ├── validate.py                 # Schema and data quality gate (GIGO)
 │   ├── feature_engineering.py      # Feature creation, encoding, scaling
 │   ├── train.py                    # Model training, pipeline bundling, artifact saving
 │   ├── evaluate.py                 # Metrics computation and diagnostic plots
-│   ├── infer.py                    # Inference / prediction on new data
-│   └── main.py                     # Pipeline orchestrator (entry point)
+│   ├── infer.py                    # Inference + W&B model loading
+│   ├── main.py                     # Pipeline orchestrator + W&B tracking
+│   └── api.py                      # FastAPI serving layer (/health, /predict)
 │
 ├── data/                           # Local storage (IGNORED by Git)
 │   ├── raw/                        # Immutable input data
@@ -132,11 +139,14 @@ This project follows a strict separation between "Sandbox" (Notebooks) and "Prod
 │   └── inference/                  # Prediction outputs
 │
 ├── models/                         # Serialized model artifacts (IGNORED by Git)
+├── logs/                           # Pipeline log files (IGNORED by Git)
 │
 ├── reports/                        # Generated metrics, plots, and figures
 │   └── figures/
 │
-└── tests/                          # Automated test suite
+├── notebooks/                      # Experimental sandbox
+│
+└── tests/                          # Automated test suite (119 tests)
     ├── test_load_data.py
     ├── test_clean_data.py
     ├── test_validate.py
@@ -144,7 +154,9 @@ This project follows a strict separation between "Sandbox" (Notebooks) and "Prod
     ├── test_train.py
     ├── test_evaluate.py
     ├── test_infer.py
-    └── test_main.py
+    ├── test_main.py
+    ├── test_utils.py
+    └── test_api.py
 ```
 
 ---
@@ -164,22 +176,42 @@ cd 1-mlops-kickoff-repo
 ### 2. Create and activate the environment
 ```bash
 conda env create -f environment.yml
-conda activate test_env
+conda activate mlops-churn
 ```
 
-### 3. Run the full ML pipeline
+### 3. Set up secrets
+```bash
+cp .env.example .env
+# Edit .env and add your WANDB_API_KEY
+```
+
+### 4. Run the full ML pipeline
 ```bash
 python -m src.main
 ```
-This will: load data, validate, clean, engineer features, train a model, evaluate it, and run inference. The trained model is saved to `models/model.pkl` and evaluation plots to `reports/figures/`.
+This will: load data, validate, clean, engineer features, train a model, evaluate it, run inference, and log everything to W&B. The model artifact is promoted with alias `prod` in the W&B registry.
 
-### 4. Run the test suite
+### 5. Run the test suite
 ```bash
 python -m pytest
 ```
-To see verbose output with coverage:
+
+### 6. Start the API server
 ```bash
-python -m pytest -v --cov=src --cov-report=term-missing
+uvicorn src.api:app --host 127.0.0.1 --port 8000
+```
+Test it:
+```bash
+curl http://127.0.0.1:8000/health
+curl -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"customers":[{"accountweeks":120,"datausage":2.7,"custservcalls":3,"daymins":200.5,"daycalls":90,"monthlycharge":65.0,"overagefee":10.25,"roammins":8.3,"contractrenewal":1,"dataplan":0}]}'
+```
+
+### 7. Build and run with Docker
+```bash
+docker build -t churn-api .
+docker run -p 8000:8000 --env-file .env churn-api
 ```
 
 ---
@@ -220,4 +252,81 @@ All pipeline parameters are centralized in `config.yaml`:
 
 - **Branches:** `main` (protected, production-ready), `dev` (integration), `feature/*` (individual work)
 - **Process:** Each collaborator works on a `feature/` branch, opens a PR to `dev`, and the team reviews before merging.
-- **Commits:** "Commit early, commit often, and push."
+- **CI:** Pull Requests trigger `ci.yml` which runs the full test suite. PRs must pass before merge.
+- **CD:** Publishing a GitHub Release triggers `deploy.yml` which deploys to Render.
+
+---
+
+## 9. Experiment Tracking & Model Registry
+
+- **Platform:** Weights & Biases (W&B)
+- **Project:** [MLOPs-Group5-telecomChurn](https://wandb.ai/diego08-ie-university/MLOPs-Group5-telecomChurn)
+- **What is tracked:** Run config, training/evaluation metrics, confusion matrix plots, pipeline logs, and model artifacts.
+- **Model registry:** The trained model is stored as a W&B artifact and promoted with alias `prod`. The API loads the `prod` artifact on startup — no local `.pkl` files in production.
+
+---
+
+## 10. API Documentation
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/health` | GET | Returns `{"status": "healthy", "model_loaded": true}` |
+| `/predict` | POST | Accepts JSON with customer data, returns churn predictions |
+| `/docs` | GET | Interactive Swagger UI (auto-generated by FastAPI) |
+
+**Request schema** (`/predict`):
+```json
+{
+  "customers": [
+    {
+      "accountweeks": 120,
+      "datausage": 2.7,
+      "custservcalls": 3,
+      "daymins": 200.5,
+      "daycalls": 90,
+      "monthlycharge": 65.0,
+      "overagefee": 10.25,
+      "roammins": 8.3,
+      "contractrenewal": 1,
+      "dataplan": 0
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "predictions": [
+    {"prediction": 0, "label": "No Churn"}
+  ]
+}
+```
+
+---
+
+## 11. Model Card
+
+| Field | Details |
+|---|---|
+| **Model name** | Telecom Churn Classifier |
+| **Model type** | Logistic Regression (sklearn Pipeline) |
+| **Task** | Binary classification (Churn / No Churn) |
+| **Training data** | Kaggle Telecom Churn dataset — 3,333 customers, 10 features |
+| **Evaluation metric** | Weighted F1 Score |
+| **Performance** | F1 (weighted) = 0.827 on held-out test set (667 samples) |
+| **Known limitations** | Class imbalance (~14.5% churn rate) limits recall on the minority class (Churn recall ~18%). Not suitable for high-stakes decisions without human review. |
+| **Intended use** | Prioritize retention outreach for at-risk customers. Marketing teams use the ranked list to allocate campaign budgets. |
+| **Out-of-scope use** | Automated account termination, credit decisions, or any use without human oversight. |
+| **Ethical considerations** | No PII in training data. Model should be monitored for demographic bias if deployed on real customer data. |
+| **Retraining cadence** | Recommended quarterly or when churn rate shifts by more than 2 percentage points. |
+
+---
+
+## 12. Changelog
+
+| Version | Date | Changes |
+|---|---|---|
+| **v1.0.0** | 2026-03-20 | Production-ready release: full ML pipeline, W&B tracking with `prod` alias, FastAPI serving (`/health`, `/predict`), Dockerfile, CI/CD workflows, 119 tests |
+| **v0.2.0** | 2026-03-15 | Repository & engineering overhaul: centralized `config.yaml`, `src/logger.py` (dual-output), zero `print()` in production code, import order cleanup, `.env` for secrets |
+| **v0.1.0** | 2026-02-28 | Initial pipeline: modular `src/` modules (load, clean, validate, features, train, evaluate, infer), `main.py` orchestrator, test suite, business case README |

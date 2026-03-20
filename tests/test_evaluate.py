@@ -52,20 +52,23 @@ class TestEvaluateModel:
         result = evaluate_model(model, X, y, "classification")
         assert 0.0 <= result <= 1.0
 
-    def test_regression_saves_residual_plot(self, tmp_path, monkeypatch, regression_fixtures):
-        """evaluate_model saves residual_plot.png to REPORTS_DIR."""
-        import src.evaluate as ev
-        monkeypatch.setattr(ev, "REPORTS_DIR", tmp_path)
+    def test_regression_saves_residual_plot(self, tmp_path, regression_fixtures):
+        """evaluate_model saves residual_plot.png to the configured reports dir."""
+        # Write a temporary config pointing reports to tmp_path
+        import yaml
+        cfg_path = tmp_path / "config.yaml"
+        cfg_path.write_text(yaml.dump({"reports": {"figures_dir": str(tmp_path)}}))
         model, X, y = regression_fixtures
-        evaluate_model(model, X, y, "regression")
+        evaluate_model(model, X, y, "regression", config_path=str(cfg_path))
         assert (tmp_path / "residual_plot.png").exists()
 
-    def test_classification_saves_confusion_matrix(self, tmp_path, monkeypatch, classification_fixtures):
-        """evaluate_model saves confusion_matrix.png to REPORTS_DIR."""
-        import src.evaluate as ev
-        monkeypatch.setattr(ev, "REPORTS_DIR", tmp_path)
+    def test_classification_saves_confusion_matrix(self, tmp_path, classification_fixtures):
+        """evaluate_model saves confusion_matrix.png to the configured reports dir."""
+        import yaml
+        cfg_path = tmp_path / "config.yaml"
+        cfg_path.write_text(yaml.dump({"reports": {"figures_dir": str(tmp_path)}}))
         model, X, y = classification_fixtures
-        evaluate_model(model, X, y, "classification")
+        evaluate_model(model, X, y, "classification", config_path=str(cfg_path))
         assert (tmp_path / "confusion_matrix.png").exists()
 
 

@@ -1,0 +1,42 @@
+# Dev and CI artifacts
+.git/
+.github/
+.claude/
+.vscode/
+.idea/
+
+# Tests and notebooks
+tests/
+notebooks/
+*.ipynb
+
+# Data, models, reports (served from W&B, not baked into image)
+data/
+models/
+reports/
+logs/
+
+# W&B local cache
+wandb/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Environment files
+.env
+.venv/
+venv/
+env/
+environment.yml
+conda-lock.yml
+
+# Docs and misc
+*.md
+*.pdf
+LICENSE
+project_instructions/
+01_opioid_analysis_vExp.ipynb

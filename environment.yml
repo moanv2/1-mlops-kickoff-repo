@@ -1,4 +1,4 @@
-name: test_env
+name: mlops-churn
 
 channels:
   - conda-forge
@@ -13,3 +13,12 @@ dependencies:
   - matplotlib
   - pyyaml
   - jupyter
+  - pip
+  - pip:
+      - wandb
+      - fastapi
+      - uvicorn[standard]
+      - pydantic
+      - python-dotenv
+      - httpx
+      - pytest
